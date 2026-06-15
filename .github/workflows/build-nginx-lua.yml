@@ -21,7 +21,7 @@ jobs:
           
     - name: Download ImmortalWrt SDK
       run: |
-        wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq60xx/immortalwrt-sdk-qualcommax-ipq60xx_gcc-14.2.0_musl.Linux-x86_64.tar.zst
+        wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq60xx/immortalwrt-sdk-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         zstd -d immortalwrt-sdk-*.tar.zst
         tar xf immortalwrt-sdk-*.tar
         mv immortalwrt-sdk-* sdk
