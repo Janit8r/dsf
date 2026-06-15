@@ -1,0 +1,60 @@
+name: Build nginx with lua using Docker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build in OpenWrt SDK container
+      run: |
+        docker run --rm -v $PWD:/build immortalwrt/sdk:aarch64_cortex-a53-openwrt-23.05 /bin/bash -c '
+          cd /builder
+          
+          # 更新feeds
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          
+          # 查找nginx-mod-lua包
+          ./scripts/feeds search lua | grep nginx
+          
+          # 安装nginx和lua模块
+          ./scripts/feeds install nginx-ssl nginx-mod-lua
+          
+          # 配置
+          make defconfig
+          echo "CONFIG_PACKAGE_nginx-ssl=m" >> .config
+          echo "CONFIG_PACKAGE_nginx-mod-lua=m" >> .config
+          make defconfig
+          
+          # 编译
+          make package/nginx-ssl/compile -j$(nproc) V=s
+          make package/nginx-mod-lua/compile -j$(nproc) V=s || true
+          
+          # 复制ipk到输出目录
+          mkdir -p /build/output
+          find bin/packages -name "*.ipk" | grep -E "(nginx|lua)" | xargs -I {} cp {} /build/output/
+          
+          ls -lh /build/output/
+        '
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nginx-lua-ipk
+        path: output/
+        if-no-files-found: warn

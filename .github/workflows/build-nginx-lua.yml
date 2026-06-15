@@ -38,15 +38,29 @@ jobs:
       run: |
         cd sdk
         make defconfig
-        # 启用nginx和lua模块
-        echo "CONFIG_PACKAGE_nginx=m" >> .config
-        echo "CONFIG_PACKAGE_nginx-ssl=m" >> .config
-        echo "CONFIG_NGINX_HTTP_LUA=y" >> .config
-        make defconfig
         
-    - name: Build nginx with lua
+        # 查看可用的nginx包
+        echo "Available nginx packages:"
+        ./scripts/feeds search nginx
+        
+        # 安装nginx-ssl包
+        ./scripts/feeds install nginx-ssl
+        
+        # 配置启用nginx-ssl
+        cat >> .config << EOF
+        CONFIG_PACKAGE_nginx-ssl=m
+        CONFIG_PACKAGE_nginx-ssl-util=m
+        EOF
+        
+        make defconfig
+        echo "Final config:"
+        grep -i nginx .config || echo "No nginx in config"
+        
+    - name: Build nginx
       run: |
         cd sdk
+        make package/feeds/packages/nginx-ssl/compile -j$(nproc) V=s || \
+        make package/nginx-ssl/compile -j$(nproc) V=s || \
         make package/nginx/compile -j$(nproc) V=s
         
     - name: Collect packages
