@@ -1,116 +1,128 @@
-# IPTV Nginx Lua Proxy
+# IPTV 透明代理解决方案
 
-自动改写m3u8内容的IPTV反向代理，解决SNAT导致的12.8KB传输限制。
+自动解决SNAT导致的12.8KB传输限制。
 
-## 架构
+## 🎯 快速方案（推荐）
 
-- **目标设备**: aarch64_cortex-a53 (QWRT 25.12.2)
-- **OpenWrt版本**: ImmortalWrt 24.10.5
+**路由器已安装Privoxy HTTP代理，无需编译！**
 
-## 编译步骤
+### VLC配置
 
-### 1. GitHub Action自动编译
+1. 打开VLC → 工具 → 首选项
+2. 左下角选择"全部"
+3. 输入/编解码器 → 访问模块 → HTTP
+4. **HTTP代理URL**: `http://192.168.1.3:8118`
+5. 保存并重启VLC
 
-1. Fork此仓库
-2. 启用 Actions
-3. 手动触发 `Build nginx-mod-luajit` workflow
-4. 等待编译完成（约15-30分钟）
-5. 下载 artifacts 中的 `.ipk` 文件
+### 播放地址
 
-### 2. 手动编译（可选）
-
-```bash
-# 下载SDK
-wget https://downloads.immortalwrt.org/releases/24.10-SNAPSHOT/targets/ipq60xx/generic/immortalwrt-sdk-24.10-SNAPSHOT-ipq60xx-generic_gcc-14.2.0_musl.Linux-x86_64.tar.xz
-tar xf immortalwrt-sdk-*.tar.xz
-cd immortalwrt-sdk-*
-
-# 更新feeds
-./scripts/feeds update -a
-./scripts/feeds install -a
-
-# 编译
-make defconfig
-make package/nginx-mod-luajit/compile -j$(nproc) V=s
-
-# 查找生成的ipk
-find bin/packages -name 'nginx-mod-luajit*.ipk'
-```
-
-## 安装
-
-### 1. 上传ipk到路由器
-
-```bash
-scp nginx-mod-luajit_*.ipk root@192.168.1.3:/tmp/
-scp install.sh root@192.168.1.3:/tmp/
-```
-
-### 2. 在路由器上安装
-
-```bash
-ssh root@192.168.1.3
-cd /tmp
-chmod +x install.sh
-./install.sh
-```
-
-## 使用方法
-
-### VLC播放地址转换
-
-**原地址：**
+直接使用原始URL：
 ```
 http://116.199.7.27:8006/00000000/1d77ac8593854801b7503a85270ee7b9/index.m3u8
 ```
 
-**新地址：**
-```
-http://192.168.1.3:8080/iptv/http://116.199.7.27:8006/00000000/1d77ac8593854801b7503a85270ee7b9/index.m3u8
-```
-
 ### 工作原理
 
-1. 客户端访问 `http://192.168.1.3:8080/iptv/{原始URL}`
-2. Nginx用Lua下载原始m3u8
-3. Lua脚本自动替换其中的`http://116.199.x.x`为`http://192.168.1.3:8080/proxy/116.199.x.x`
-4. VLC下载TS时自动通过nginx代理
-5. Nginx以`192.168.100.2`身份访问IPTV服务器
-
-## 备用方案
-
-如果lua模块编译失败，使用Privoxy HTTP代理：
-
-```bash
-opkg install privoxy
-# VLC设置HTTP代理: http://192.168.1.3:8118
-# 直接播放原始m3u8地址
+```
+VLC → Privoxy(192.168.1.3:8118) → SNAT(192.168.100.2) → 116.199.x.x
 ```
 
-## 故障排查
+- ✅ 无需改写m3u8
+- ✅ 支持5000+并发
+- ✅ 所有设备通用
+- ✅ 已安装可用
 
-### 检查nginx是否运行
+---
+
+## 🔧 高级方案：Nginx + Lua（可选）
+
+如需自动改写m3u8 URL，可编译nginx lua模块。
+
+### GitHub Action编译
+
+1. Fork此仓库
+2. 启用 Actions
+3. 手动触发 `Build nginx-mod-luajit` workflow
+4. 等待编译完成
+5. 下载 artifacts
+
+### 手动编译
+
 ```bash
-ps | grep nginx
-netstat -ln | grep 8080
+# 下载SDK
+wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq60xx/immortalwrt-sdk-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+zstd -d immortalwrt-sdk-*.tar.zst
+tar xf immortalwrt-sdk-*.tar
+cd immortalwrt-sdk-*
+
+# 更新feeds
+./scripts/feeds update -a
+./scripts/feeds install nginx-ssl
+
+# 配置
+make menuconfig
+# 选择: Network → Web Servers → nginx-ssl
+
+# 编译
+make package/nginx-ssl/compile -j$(nproc)
+
+# 查找ipk
+find bin/packages -name 'nginx*.ipk'
 ```
 
-### 查看nginx错误日志
-```bash
-cat /var/log/nginx/error.log
+### 使用Nginx方案
+
+播放地址转换：
+```
+原: http://116.199.7.27:8006/path/file.m3u8
+改: http://192.168.1.3:8080/iptv/http://116.199.7.27:8006/path/file.m3u8
 ```
 
-### 手动测试m3u8转换
+---
+
+## 📊 性能对比
+
+| 方案 | 并发能力 | 路由器负载 | 配置复杂度 |
+|------|---------|-----------|----------|
+| Privoxy | 5000+ | 低 | ⭐ 简单 |
+| Nginx反向代理 | 500 | 高 | ⭐⭐⭐ 复杂 |
+| 纯SNAT转发 | 10000+ | 极低 | ⭐⭐ 中等 |
+
+**推荐使用Privoxy方案！**
+
+---
+
+## 🐛 故障排查
+
+### Privoxy不工作
+
 ```bash
-curl "http://192.168.1.3:8080/iptv/http://116.199.7.27:8006/00000000/xxx/index.m3u8"
+ssh root@192.168.1.3
+ps | grep privoxy
+netstat -ln | grep 8118
+
+# 重启privoxy
+/etc/init.d/privoxy restart
 ```
+
+### VLC无法播放
+
+1. 检查VLC代理设置
+2. 测试: `curl -x http://192.168.1.3:8118 http://116.199.7.27:8006/`
+3. 检查路由器网络: `ssh root@192.168.1.3 "curl -I http://116.199.7.27:8006/"`
+
+---
 
 ## 网络拓扑
 
 ```
-客户端 → 192.168.1.3:8080 (Nginx+Lua)
-           ↓ (SNAT to 192.168.100.2)
-       116.199.x.x IPTV服务器
+客户端(192.168.1.x) 
+    ↓ HTTP代理
+192.168.1.3:8118 (Privoxy)
+    ↓ SNAT
+192.168.100.2
+    ↓
+116.199.x.x IPTV服务器
 ```
 
 ## 许可证
