@@ -52,12 +52,25 @@ jobs:
     - name: Collect packages
       run: |
         mkdir -p artifacts
-        find sdk/bin/packages -name 'nginx*.ipk' -exec cp {} artifacts/ \;
-        find sdk/bin/packages -name 'lua*.ipk' -exec cp {} artifacts/ \;
-        ls -lh artifacts/
+        echo "Searching for ipk files..."
+        find sdk/bin -name '*.ipk' -type f
+        echo ""
+        echo "Copying nginx and lua packages..."
+        find sdk/bin -name 'nginx*.ipk' -type f -exec cp {} artifacts/ \; || true
+        find sdk/bin -name '*lua*.ipk' -type f -exec cp {} artifacts/ \; || true
+        echo ""
+        echo "Artifacts collected:"
+        ls -lh artifacts/ || echo "No artifacts found"
+        
+        # 如果没有文件，创建一个说明文件
+        if [ -z "$(ls -A artifacts/)" ]; then
+          echo "No ipk files were generated. Check build logs above." > artifacts/README.txt
+        fi
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: nginx-lua-modules
-        path: artifacts/*.ipk
+        path: artifacts/
+        if-no-files-found: warn
