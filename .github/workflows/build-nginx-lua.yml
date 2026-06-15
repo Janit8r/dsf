@@ -17,12 +17,13 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential libncurses5-dev gawk git gettext \
-          libssl-dev xsltproc wget unzip python3
+          libssl-dev xsltproc wget unzip python3 zstd
           
     - name: Download ImmortalWrt SDK
       run: |
-        wget https://downloads.immortalwrt.org/releases/24.10-SNAPSHOT/targets/ipq60xx/generic/immortalwrt-sdk-24.10-SNAPSHOT-ipq60xx-generic_gcc-14.2.0_musl.Linux-x86_64.tar.xz
-        tar xf immortalwrt-sdk-*.tar.xz
+        wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq60xx/immortalwrt-sdk-qualcommax-ipq60xx_gcc-14.2.0_musl.Linux-x86_64.tar.zst
+        zstd -d immortalwrt-sdk-*.tar.zst
+        tar xf immortalwrt-sdk-*.tar
         mv immortalwrt-sdk-* sdk
         
     - name: Update feeds
@@ -45,7 +46,7 @@ jobs:
         ls -lh artifacts/
         
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: nginx-lua-modules
         path: artifacts/*.ipk
