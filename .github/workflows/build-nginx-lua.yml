@@ -34,17 +34,26 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
         
-    - name: Build nginx-mod-luajit
+    - name: Configure build
       run: |
         cd sdk
         make defconfig
-        make package/nginx-mod-luajit/compile -j$(nproc) V=s
+        # 启用nginx和lua模块
+        echo "CONFIG_PACKAGE_nginx=m" >> .config
+        echo "CONFIG_PACKAGE_nginx-ssl=m" >> .config
+        echo "CONFIG_NGINX_HTTP_LUA=y" >> .config
+        make defconfig
+        
+    - name: Build nginx with lua
+      run: |
+        cd sdk
+        make package/nginx/compile -j$(nproc) V=s
         
     - name: Collect packages
       run: |
         mkdir -p artifacts
-        find sdk/bin/packages -name 'nginx-mod-luajit*.ipk' -exec cp {} artifacts/ \;
-        find sdk/bin/packages -name 'liblua*' -exec cp {} artifacts/ \;
+        find sdk/bin/packages -name 'nginx*.ipk' -exec cp {} artifacts/ \;
+        find sdk/bin/packages -name 'lua*.ipk' -exec cp {} artifacts/ \;
         ls -lh artifacts/
         
     - name: Upload artifacts
