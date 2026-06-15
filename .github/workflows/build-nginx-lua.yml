@@ -24,7 +24,8 @@ jobs:
         wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq60xx/immortalwrt-sdk-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         zstd -d immortalwrt-sdk-*.tar.zst
         tar xf immortalwrt-sdk-*.tar
-        mv immortalwrt-sdk-* sdk
+        mv immortalwrt-sdk-* sdk || mv immortalwrt-sdk sdk
+        ls -la sdk/
         
     - name: Update feeds
       run: |
